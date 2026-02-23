@@ -398,6 +398,49 @@
   .ticker-item.statement .ticker-dot { background:var(--statement); }
   .ticker-item.special  .ticker-dot { background:var(--special); }
 
+  /* ─── CWA SELECTOR BAR ─── */
+  .cwa-bar {
+    padding: 8px 20px;
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,168,232,0.04);
+  }
+  .cwa-label {
+    font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700;
+    color:var(--muted); text-transform:uppercase; letter-spacing:1px;
+    margin-right:4px; white-space:nowrap;
+  }
+  .cwa-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:12px; font-weight:700;
+    letter-spacing:.5px; text-transform:uppercase;
+    padding: 5px 14px; border-radius:2px;
+    cursor:pointer; transition:all .15s;
+    display:flex; flex-direction:column; align-items:center; gap:1px;
+    line-height:1;
+  }
+  .cwa-btn .cwa-id   { font-size:14px; font-weight:900; }
+  .cwa-btn .cwa-city { font-size:10px; letter-spacing:1px; opacity:.7; }
+  .cwa-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .cwa-btn.active {
+    background: rgba(0,168,232,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 10px rgba(0,168,232,0.2);
+  }
+  .cwa-btn.active .cwa-id { text-shadow: 0 0 8px var(--accent); }
+  .cwa-count {
+    font-family:'Share Tech Mono',monospace;
+    font-size:10px; background:var(--accent);
+    color:#000; border-radius:8px;
+    padding:1px 5px; margin-left:4px;
+    display:inline-block; min-width:16px; text-align:center;
+  }
+  .cwa-count.zero { background:var(--border); color:var(--muted); }
+
   .bottom-pad { height:52px; }
 
   ::-webkit-scrollbar { width:6px; }
@@ -461,6 +504,39 @@
   <div id="lastUpdated">Last update: --</div>
 </div>
 
+<!-- ─── CWA SELECTOR ─── -->
+<div class="cwa-bar">
+  <span class="cwa-label">CWA Office:</span>
+  <button class="cwa-btn active" data-cwa="ALL">
+    <span class="cwa-id">ALL <span class="cwa-count" id="cwa-count-ALL">--</span></span>
+    <span class="cwa-city">Statewide</span>
+  </button>
+  <button class="cwa-btn" data-cwa="JAX">
+    <span class="cwa-id">JAX <span class="cwa-count zero" id="cwa-count-JAX">0</span></span>
+    <span class="cwa-city">Jacksonville</span>
+  </button>
+  <button class="cwa-btn" data-cwa="TAE">
+    <span class="cwa-id">TAE <span class="cwa-count zero" id="cwa-count-TAE">0</span></span>
+    <span class="cwa-city">Tallahassee</span>
+  </button>
+  <button class="cwa-btn" data-cwa="TBW">
+    <span class="cwa-id">TBW <span class="cwa-count zero" id="cwa-count-TBW">0</span></span>
+    <span class="cwa-city">Tampa Bay</span>
+  </button>
+  <button class="cwa-btn" data-cwa="MLB">
+    <span class="cwa-id">MLB <span class="cwa-count zero" id="cwa-count-MLB">0</span></span>
+    <span class="cwa-city">Melbourne</span>
+  </button>
+  <button class="cwa-btn" data-cwa="MFL">
+    <span class="cwa-id">MFL <span class="cwa-count zero" id="cwa-count-MFL">0</span></span>
+    <span class="cwa-city">Miami</span>
+  </button>
+  <button class="cwa-btn" data-cwa="KEY">
+    <span class="cwa-id">KEY <span class="cwa-count zero" id="cwa-count-KEY">0</span></span>
+    <span class="cwa-city">Key West</span>
+  </button>
+</div>
+
 <!-- ─── FILTER BAR ─── -->
 <div class="filter-bar">
   <span class="filter-label">Show:</span>
@@ -511,6 +587,23 @@ let allAlerts   = [];
 let allLSRs     = [];
 let knownIds    = new Set();
 let activeFilter = 'all';
+let activeCWA = 'ALL';
+
+// Florida CWA office IDs mapped to sender name keywords
+const CWA_MAP = {
+  JAX: ['jacksonville','JAX'],
+  TAE: ['tallahassee','TAE'],
+  TBW: ['tampa','TBW'],
+  MLB: ['melbourne','MLB'],
+  MFL: ['miami','MFL'],
+  KEY: ['key west','KEY'],
+};
+
+function matchesCWA(alert, cwa) {
+  if (cwa === 'ALL') return true;
+  const s = (alert.sender || '').toLowerCase();
+  return CWA_MAP[cwa].some(k => s.includes(k.toLowerCase()));
+}
 let soundEnabled = true;
 let audioCtx = null;
 let expireTimers = new Map();
@@ -755,8 +848,11 @@ function timeSince(d) {
 //  RENDER ALERTS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function filteredAlerts() {
-  if (activeFilter === 'all') return allAlerts;
-  return allAlerts.filter(a => a.sevClass === activeFilter);
+  return allAlerts.filter(a => {
+    const sevOk = (activeFilter === 'all') || (a.sevClass === activeFilter);
+    const cwaOk = matchesCWA(a, activeCWA);
+    return sevOk && cwaOk;
+  });
 }
 
 function renderAlerts() {
@@ -849,7 +945,7 @@ function scheduleExpire(a, card) {
 function renderLSRs() {
   const container = document.getElementById('lsrContainer');
   const section   = document.getElementById('lsrSection');
-  const lsrs = (activeFilter === 'all' || activeFilter === 'lsr') ? allLSRs : [];
+  const lsrs = (activeFilter === 'all' || activeFilter === 'lsr') ? allLSRs.filter(l => matchesCWA(l, activeCWA)) : [];
 
   if (lsrs.length === 0) { section.style.display='none'; container.innerHTML=''; return; }
   section.style.display = 'flex';
@@ -905,11 +1001,36 @@ function updateCount() {
   document.getElementById('alertCount').textContent =
     `${total} Active Alert${total!==1?'s':''} · ${warns} Warning${warns!==1?'s':''}`;
   document.getElementById('alertBadge').textContent = filteredAlerts().length;
+
+  // Update per-CWA badge counts
+  const allCWAs = ['ALL','JAX','TAE','TBW','MLB','MFL','KEY'];
+  allCWAs.forEach(cwa => {
+    const el = document.getElementById('cwa-count-' + cwa);
+    if (!el) return;
+    const n = cwa === 'ALL'
+      ? allAlerts.length
+      : allAlerts.filter(a => matchesCWA(a, cwa)).length;
+    el.textContent = n;
+    el.className = 'cwa-count' + (n === 0 ? ' zero' : '');
+  });
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  FILTERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ─── CWA BUTTON CLICKS ───
+document.querySelectorAll('.cwa-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cwa-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeCWA = btn.dataset.cwa;
+    renderAlerts();
+    renderLSRs();
+    renderTicker();
+    updateCount();
+  });
+});
+
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
