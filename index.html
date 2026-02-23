@@ -654,6 +654,7 @@ function processAlerts(features) {
       headline:    props.headline || event,
       description: props.description || '',
       areas:       props.areaDesc || '',
+      sent:        props.sent ? new Date(props.sent) : props.effective ? new Date(props.effective) : props.onset ? new Date(props.onset) : now,
       onset:       props.onset ? new Date(props.onset) : now,
       expires,
       sender:      props.senderName || 'NWS',
@@ -677,9 +678,9 @@ function processAlerts(features) {
   // Update known IDs
   knownIds = freshIds;
 
-  // Sort newest-first (by onset date)
-  newAlerts.sort((a, b) => b.onset - a.onset);
-  newLSRs.sort((a, b) => b.onset - a.onset);
+  // Sort newest-first by actual sent/issued time
+  newAlerts.sort((a, b) => b.sent - a.sent);
+  newLSRs.sort((a, b) => b.sent - a.sent);
 
   allAlerts = newAlerts;
   allLSRs   = newLSRs;
@@ -807,8 +808,8 @@ function buildCard(a) {
         <span class="new-tag">NEW</span>
       </div>
       <div class="alert-issued">
-        Issued: ${fmtDate(a.onset)} ${fmtTime(a.onset)}
-        <span class="issued-new">${a.isNew ? ' — ' + timeSince(a.onset) : ''}</span>
+        Issued: ${fmtDate(a.sent)} ${fmtTime(a.sent)}
+        <span class="issued-new">${a.isNew ? ' — ' + timeSince(a.sent) : ''}</span>
       </div>
       <div class="alert-areas"><strong>Areas:</strong> ${escHtml(areas)}${moreAreas ? `<em style="color:var(--muted)"> ${moreAreas}</em>` : ''}</div>
       <div class="alert-description" id="desc-${safeId}">${escHtml(a.remark || a.description.slice(0,300))}</div>
@@ -861,7 +862,7 @@ function renderLSRs() {
     card.innerHTML = `
       <div class="lsr-card-header">
         <div class="lsr-event-type">${escHtml(l.event.replace(/local storm report/i,'').trim()||l.event)}</div>
-        <div class="lsr-time">${fmtDate(l.onset)} ${fmtTime(l.onset)}</div>
+        <div class="lsr-time">${fmtDate(l.sent)} ${fmtTime(l.sent)}</div>
       </div>
       ${l.magnitude ? `<div class="lsr-magnitude">${escHtml(l.magnitude)}</div>` : ''}
       <div class="lsr-location">${escHtml(l.areas.split(';')[0]||'')}</div>
@@ -888,7 +889,7 @@ function renderTicker() {
     <div class="ticker-item ${a.sevClass||'lsr'}">
       <div class="ticker-dot"></div>
       ${escHtml(a.event)} — ${escHtml((a.areas.split(';')[0]||'').trim())}
-      ${a.onset ? ` · ${fmtTime(a.onset)}` : ''}
+      ${a.sent ? ` · Issued ${fmtTime(a.sent)}` : ''}
       ${a.expires ? ` · Exp ${fmtTime(a.expires)}` : ''}
     </div>
   `).join('');
